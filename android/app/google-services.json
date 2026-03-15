@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "182240527615",
-    "project_id": "quanlysinhvien-4c9a9",
-    "storage_bucket": "quanlysinhvien-4c9a9.firebasestorage.app"
+    "project_number": "270818752988",
+    "project_id": "baitaplo",
+    "storage_bucket": "baitaplo.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:182240527615:android:b3bc0ef424911f1a1978ca",
+        "mobilesdk_app_id": "1:270818752988:android:6095a4254a6a22c9f1f719",
         "android_client_info": {
           "package_name": "com.example.baitaplon"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBtk0zHEi15cpb8ob5B6P4vQckQEllqI0Y"
+          "current_key": "AIzaSyCul8U_2-MuFnEef41FCKNumRirraDmbD4"
         }
       ],
       "services": {

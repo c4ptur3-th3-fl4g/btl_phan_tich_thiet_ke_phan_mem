@@ -41,48 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAoVh1h886tEBajr9h0JWOXhNZomrIUaHc',
-    appId: '1:182240527615:web:d2124bd972e9ca411978ca',
-    messagingSenderId: '182240527615',
-    projectId: 'quanlysinhvien-4c9a9',
-    authDomain: 'quanlysinhvien-4c9a9.firebaseapp.com',
-    storageBucket: 'quanlysinhvien-4c9a9.firebasestorage.app',
-    measurementId: 'G-9Z7XH2PHRM',
+    apiKey: 'AIzaSyDQpS7o2UmoT8AWE45Lr788ZuxaJ3EOUzw',
+    appId: '1:270818752988:web:02a108cb1c9bdfc1f1f719',
+    messagingSenderId: '270818752988',
+    projectId: 'baitaplo',
+    authDomain: 'baitaplo.firebaseapp.com',
+    storageBucket: 'baitaplo.firebasestorage.app',
+    measurementId: 'G-09440083LD',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBtk0zHEi15cpb8ob5B6P4vQckQEllqI0Y',
-    appId: '1:182240527615:android:b3bc0ef424911f1a1978ca',
-    messagingSenderId: '182240527615',
-    projectId: 'quanlysinhvien-4c9a9',
-    storageBucket: 'quanlysinhvien-4c9a9.firebasestorage.app',
+    apiKey: 'AIzaSyCul8U_2-MuFnEef41FCKNumRirraDmbD4',
+    appId: '1:270818752988:android:6095a4254a6a22c9f1f719',
+    messagingSenderId: '270818752988',
+    projectId: 'baitaplo',
+    storageBucket: 'baitaplo.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDhTfzqngoVXV1WiffUqbzQ6G_2AkiHWbU',
-    appId: '1:182240527615:ios:21c27490de0c50a01978ca',
-    messagingSenderId: '182240527615',
-    projectId: 'quanlysinhvien-4c9a9',
-    storageBucket: 'quanlysinhvien-4c9a9.firebasestorage.app',
+    apiKey: 'AIzaSyDwR4S4GQNO5icSBUjQshODTH2emOTkMJg',
+    appId: '1:270818752988:ios:24a93aa3343e59edf1f719',
+    messagingSenderId: '270818752988',
+    projectId: 'baitaplo',
+    storageBucket: 'baitaplo.firebasestorage.app',
     iosBundleId: 'com.example.baitaplon',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDhTfzqngoVXV1WiffUqbzQ6G_2AkiHWbU',
-    appId: '1:182240527615:ios:21c27490de0c50a01978ca',
-    messagingSenderId: '182240527615',
-    projectId: 'quanlysinhvien-4c9a9',
-    storageBucket: 'quanlysinhvien-4c9a9.firebasestorage.app',
+    apiKey: 'AIzaSyDwR4S4GQNO5icSBUjQshODTH2emOTkMJg',
+    appId: '1:270818752988:ios:24a93aa3343e59edf1f719',
+    messagingSenderId: '270818752988',
+    projectId: 'baitaplo',
+    storageBucket: 'baitaplo.firebasestorage.app',
     iosBundleId: 'com.example.baitaplon',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAoVh1h886tEBajr9h0JWOXhNZomrIUaHc',
-    appId: '1:182240527615:web:90e6f68d2df2cc371978ca',
-    messagingSenderId: '182240527615',
-    projectId: 'quanlysinhvien-4c9a9',
-    authDomain: 'quanlysinhvien-4c9a9.firebaseapp.com',
-    storageBucket: 'quanlysinhvien-4c9a9.firebasestorage.app',
-    measurementId: 'G-R2PHZQGC0F',
+    apiKey: 'AIzaSyDQpS7o2UmoT8AWE45Lr788ZuxaJ3EOUzw',
+    appId: '1:270818752988:web:e71fcc5636fad97df1f719',
+    messagingSenderId: '270818752988',
+    projectId: 'baitaplo',
+    authDomain: 'baitaplo.firebaseapp.com',
+    storageBucket: 'baitaplo.firebasestorage.app',
+    measurementId: 'G-NS8CX1DMN0',
   );
+
 }

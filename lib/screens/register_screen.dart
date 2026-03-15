@@ -15,6 +15,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmController = TextEditingController();
   bool _obscure = true;
   bool _isLoading = false;
+  String _selectedRole = 'Sinh viên';
 
   Future<void> _registerUser() async {
     final fullName = _fullNameController.text.trim();
@@ -41,22 +42,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
     try {
       final users = FirebaseFirestore.instance.collection('users');
+      if (_selectedRole == 'Quản trị') {
+        final adminQuery = await users
+            .where('role', isEqualTo: 'Quản trị')
+            .get();
+        if (adminQuery.docs.isNotEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đã tồn tại tài khoản quản trị.')),
+            );
+          }
+          return;
+        }
+      }
       await users.doc(email).set({
         'name': fullName,
         'email': email,
         'password': password,
+        'role': _selectedRole,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Đăng ký thành công')));
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Đăng ký thành công')));
+        Navigator.of(context).pop();
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Lỗi đăng ký: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi đăng ký: $e')));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -107,6 +126,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 const SizedBox(height: 22),
+                const Text(
+                  'CHỌN VAI TRÒ',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.grey.shade200,
+                  ),
+                  child: Row(
+                    children: [
+                      _roleChip('Sinh viên'),
+                      _roleChip('Giảng viên'),
+                      _roleChip('Quản trị'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 const Text(
                   'HỌ VÀ TÊN',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -239,6 +278,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
         contentPadding: const EdgeInsets.symmetric(
           vertical: 18,
           horizontal: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _roleChip(String role) {
+    final selected = _selectedRole == role;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedRole = role),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? Colors.black : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            role,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? Colors.white : Colors.black87,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );
