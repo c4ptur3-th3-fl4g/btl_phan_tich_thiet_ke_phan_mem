@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -12,6 +13,57 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscure = true;
   int selectedRole = 0;
+  bool _isLoading = false;
+
+  Future<void> _loginUser() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng điền email và mật khẩu')),
+      );
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(email)
+          .get();
+      if (!userDoc.exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tài khoản không tồn tại')),
+          );
+        }
+      } else {
+        final data = userDoc.data();
+        if (data != null && data['password'] == password) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đăng nhập thành công')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Sai mật khẩu')));
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi đăng nhập: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -115,20 +167,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: _isLoading ? null : _loginUser,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Đăng nhập   →',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Đăng nhập   →',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 12),

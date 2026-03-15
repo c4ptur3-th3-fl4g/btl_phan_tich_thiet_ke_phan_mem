@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -13,6 +14,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _obscure = true;
+  bool _isLoading = false;
+
+  Future<void> _registerUser() async {
+    final fullName = _fullNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+
+    if (fullName.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirm.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng điền đầy đủ thông tin')),
+      );
+      return;
+    }
+    if (password != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mật khẩu xác nhận không khớp')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final users = FirebaseFirestore.instance.collection('users');
+      await users.doc(email).set({
+        'name': fullName,
+        'email': email,
+        'password': password,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đăng ký thành công')));
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi đăng ký: $e')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -116,22 +162,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // handle register
-                    },
+                    onPressed: _isLoading ? null : _registerUser,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Đăng ký',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Đăng ký',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 12),
