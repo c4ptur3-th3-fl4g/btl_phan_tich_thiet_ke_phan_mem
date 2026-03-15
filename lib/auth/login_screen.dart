@@ -57,9 +57,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
           if (mounted) {
             if (userRole == 'Sinh viên') {
-              Navigator.of(context).pushReplacementNamed('/dashboard');
+              Navigator.of(context).pushReplacementNamed(
+                '/dashboard',
+                arguments: {'email': email, 'role': userRole},
+              );
             } else {
-              Navigator.of(context).pushReplacementNamed('/manager-dashboard');
+              Navigator.of(context).pushReplacementNamed(
+                '/manager-dashboard',
+                arguments: {'email': email, 'role': userRole},
+              );
             }
           }
         } else {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ManagerStudentListScreen extends StatefulWidget {
   const ManagerStudentListScreen({super.key});
@@ -14,34 +15,44 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
   String _selectedKhoa = 'Tất cả Khoa';
   int _currentPage = 1;
 
-  final List<Map<String, String>> _students = [
-    {
-      'id': '2023001',
-      'name': 'Nguyễn Văn A',
-      'dob': '12/05/2004',
-      'class': 'CNTT-01',
-      'email': 'a.nguyen@edu.vn',
-    },
-    {
-      'id': '2023042',
-      'name': 'Trần Thị B',
-      'dob': '20/08/2004',
-      'class': 'CNTT-02',
-      'email': 'b.tran@edu.vn',
-    },
-    {
-      'id': '2022115',
-      'name': 'Lê Minh C',
-      'dob': '05/02/2003',
-      'class': 'KT-01',
-      'email': 'c.le@edu.vn',
-    },
-  ];
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  List<Map<String, String>> _applyFilters(List<Map<String, String>> students) {
+    final query = _searchController.text.trim().toLowerCase();
+    return students.where((student) {
+      final classOk =
+          _selectedClass == 'Tất cả Lớp' || student['class'] == _selectedClass;
+      final khoaOk =
+          _selectedKhoa == 'Tất cả Khoa' || student['khoa'] == _selectedKhoa;
+      final searchOk =
+          query.isEmpty ||
+          (student['name'] ?? '').toLowerCase().contains(query) ||
+          (student['id'] ?? '').toLowerCase().contains(query);
+      return classOk && khoaOk && searchOk;
+    }).toList();
+  }
+
+  List<Map<String, String>> _mapSnapshotToStudents(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) {
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': (data['studentId'] as String?) ?? doc.id,
+        'name':
+            (data['fullName'] as String?) ??
+            (data['name'] as String?) ??
+            'Chưa có tên',
+        'dob': (data['dob'] as String?) ?? '--/--/----',
+        'class': (data['lop'] as String?) ?? '---',
+        'khoa': (data['khoa'] as String?) ?? '---',
+        'email': (data['email'] as String?) ?? '---',
+      };
+    }).toList();
   }
 
   @override
@@ -157,6 +168,7 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: TextField(
                       controller: _searchController,
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: 'Tìm theo tên hoặc MSSV',
                         hintStyle: const TextStyle(
@@ -205,7 +217,12 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
                           child: _buildDropdown(
                             title: 'KHOA',
                             value: _selectedKhoa,
-                            items: const ['Tất cả Khoa', 'CNTT', 'Kinh tế'],
+                            items: const [
+                              'Tất cả Khoa',
+                              'Công nghệ thông tin',
+                              'Kinh tế',
+                              'Điện tử',
+                            ],
                             onChanged: (val) => setState(
                               () => _selectedKhoa = val ?? 'Tất cả Khoa',
                             ),
@@ -216,34 +233,68 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text(
-                          'DANH SÁCH SINH VIÊN (124)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 40 / 2,
-                          ),
-                        ),
-                        Text(
-                          'Sắp xếp: Tên A-Z',
-                          style: TextStyle(
-                            decoration: TextDecoration.underline,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(24, 8, 24, 8),
-                    child: Divider(height: 1, color: Colors.black38),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      children: _students.map(_buildStudentCard).toList(),
+                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('student_profiles')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final allStudents = snapshot.hasData
+                            ? _mapSnapshotToStudents(snapshot.data!)
+                            : <Map<String, String>>[];
+                        final students = _applyFilters(allStudents);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'DANH SÁCH SINH VIÊN (${students.length})',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 40 / 2,
+                                  ),
+                                ),
+                                const Text(
+                                  'Sắp xếp: Tên A-Z',
+                                  style: TextStyle(
+                                    decoration: TextDecoration.underline,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(0, 8, 0, 8),
+                              child: Divider(height: 1, color: Colors.black38),
+                            ),
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else if (students.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: Text('Chưa có dữ liệu sinh viên'),
+                                ),
+                              )
+                            else
+                              Column(
+                                children: students
+                                    .map(
+                                      (student) => _buildStudentCard(student),
+                                    )
+                                    .toList(),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 14),

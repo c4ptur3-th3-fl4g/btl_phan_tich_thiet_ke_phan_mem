@@ -62,6 +62,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'role': _selectedRole,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      if (_selectedRole == 'Sinh viên') {
+        await FirebaseFirestore.instance
+            .collection('student_profiles')
+            .doc(email)
+            .set({
+              'fullName': fullName,
+              'email': email,
+              'studentId': email.split('@').first,
+              'dob': '',
+              'idNumber': '',
+              'address': '',
+              'khoa': null,
+              'lop': null,
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
