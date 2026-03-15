@@ -14,10 +14,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   int selectedRole = 0;
   bool _isLoading = false;
+  static const List<String> _roles = ['Sinh viên', 'Giảng viên', 'Quản trị'];
 
   Future<void> _loginUser() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    final selectedRoleName = _roles[selectedRole];
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng điền email và mật khẩu')),
@@ -39,10 +41,26 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         final data = userDoc.data();
         if (data != null && data['password'] == password) {
+          final userRole = (data['role'] as String?) ?? 'Sinh viên';
+          if (userRole != selectedRoleName) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Tài khoản thuộc vai trò "$userRole", không phải "$selectedRoleName"',
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Đăng nhập thành công')),
-            );
+            if (userRole == 'Sinh viên') {
+              Navigator.of(context).pushReplacementNamed('/dashboard');
+            } else {
+              Navigator.of(context).pushReplacementNamed('/manager-dashboard');
+            }
           }
         } else {
           if (mounted) {

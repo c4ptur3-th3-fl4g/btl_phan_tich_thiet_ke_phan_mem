@@ -1,9 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-
+import 'auth/login_screen.dart';
+import 'auth/register_screen.dart';
+import 'screens/dashboard/manager_student_list_screen.dart';
+import 'screens/dashboard/student_management_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
+        '/dashboard': (context) => const StudentManagementScreen(),
+        '/manager-dashboard': (context) => const ManagerStudentListScreen(),
       },
     );
   }
