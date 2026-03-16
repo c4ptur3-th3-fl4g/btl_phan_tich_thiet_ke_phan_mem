@@ -16,11 +16,34 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   static const List<String> _roles = ['Sinh viên', 'Giảng viên', 'Quản trị'];
 
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _findUser(
+    String identifier,
+  ) async {
+    final users = FirebaseFirestore.instance.collection('users');
+
+    final byDocId = await users.doc(identifier).get();
+    if (byDocId.exists) return byDocId;
+
+    final byUsername = await users
+        .where('username', isEqualTo: identifier)
+        .limit(1)
+        .get();
+    if (byUsername.docs.isNotEmpty) return byUsername.docs.first;
+
+    final byEmail = await users
+        .where('email', isEqualTo: identifier)
+        .limit(1)
+        .get();
+    if (byEmail.docs.isNotEmpty) return byEmail.docs.first;
+
+    return null;
+  }
+
   Future<void> _loginUser() async {
-    final email = _emailController.text.trim();
+    final identifier = _emailController.text.trim();
     final password = _passwordController.text;
     final selectedRoleName = _roles[selectedRole];
-    if (email.isEmpty || password.isEmpty) {
+    if (identifier.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng điền email và mật khẩu')),
       );
@@ -28,11 +51,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(email)
-          .get();
-      if (!userDoc.exists) {
+      final userDoc = await _findUser(identifier);
+      if (userDoc == null || !userDoc.exists) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Tài khoản không tồn tại')),
@@ -56,15 +76,16 @@ class _LoginScreenState extends State<LoginScreen> {
           }
 
           if (mounted) {
+            final routeEmail = (data['email'] as String?) ?? identifier;
             if (userRole == 'Sinh viên') {
               Navigator.of(context).pushReplacementNamed(
                 '/dashboard',
-                arguments: {'email': email, 'role': userRole},
+                arguments: {'email': routeEmail, 'role': userRole},
               );
             } else {
               Navigator.of(context).pushReplacementNamed(
                 '/manager-dashboard',
-                arguments: {'email': email, 'role': userRole},
+                arguments: {'email': routeEmail, 'role': userRole},
               );
             }
           }

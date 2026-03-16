@@ -22,6 +22,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   String? _profileDocId;
   bool _didInit = false;
 
+  void _logout() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -156,7 +160,11 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           onPressed: () => Navigator.maybePop(context),
         ),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.more_horiz)),
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Đăng xuất',
+          ),
         ],
       ),
       body: SafeArea(

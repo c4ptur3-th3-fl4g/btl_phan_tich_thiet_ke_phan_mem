@@ -1,14 +1,29 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
+import 'screens/dashboard/class_management_screen.dart';
 import 'screens/dashboard/manager_student_list_screen.dart';
 import 'screens/dashboard/student_management_screen.dart';
+
+Future<void> _ensureDefaultAdminUser() async {
+  await FirebaseFirestore.instance.collection('users').doc('ad min').set({
+    'username': 'ad min',
+    'email': 'ad min',
+    'password': 'admin',
+    'role': 'Quản trị',
+    'name': 'Administrator',
+    'createdAt': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await _ensureDefaultAdminUser();
   runApp(const MyApp());
 }
 
@@ -30,6 +45,7 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/dashboard': (context) => const StudentManagementScreen(),
         '/manager-dashboard': (context) => const ManagerStudentListScreen(),
+        '/class-management': (context) => const ClassManagementScreen(),
       },
     );
   }

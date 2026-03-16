@@ -14,6 +14,43 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
   String _selectedClass = 'Tất cả Lớp';
   String _selectedKhoa = 'Tất cả Khoa';
   int _currentPage = 1;
+  bool _didInit = false;
+  String _role = '';
+  String _email = '';
+
+  bool get _canEditStudent => _role == 'Giảng viên';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didInit) return;
+    _didInit = true;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _role = (args?['role'] as String?) ?? '';
+    _email = (args?['email'] as String?) ?? '';
+  }
+
+  void _logout() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
+  void _openClassManagement() {
+    if (_role != 'Giảng viên' && _role != 'Quản trị') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Tính năng quản lý lớp học chỉ dành cho giảng viên/quản trị viên.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pushNamed(
+      '/class-management',
+      arguments: {'email': _email, 'role': _role},
+    );
+  }
 
   @override
   void dispose() {
@@ -42,6 +79,7 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
     return snapshot.docs.map((doc) {
       final data = doc.data();
       return {
+        'docId': doc.id,
         'id': (data['studentId'] as String?) ?? doc.id,
         'name':
             (data['fullName'] as String?) ??
@@ -51,8 +89,179 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
         'class': (data['lop'] as String?) ?? '---',
         'khoa': (data['khoa'] as String?) ?? '---',
         'email': (data['email'] as String?) ?? '---',
+        'address': (data['address'] as String?) ?? '',
+        'idNumber': (data['idNumber'] as String?) ?? '',
       };
     }).toList();
+  }
+
+  Widget _buildClassDropdownFromStudents() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('student_profiles')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final options = <String>{'Tất cả Lớp'};
+        if (snapshot.hasData) {
+          for (final doc in snapshot.data!.docs) {
+            final lop = (doc.data()['lop'] as String?)?.trim();
+            if (lop != null && lop.isNotEmpty) {
+              options.add(lop);
+            }
+          }
+        }
+
+        final sorted = options.toList()..sort();
+        if (sorted.contains('Tất cả Lớp')) {
+          sorted
+            ..remove('Tất cả Lớp')
+            ..insert(0, 'Tất cả Lớp');
+        }
+
+        final selected = sorted.contains(_selectedClass)
+            ? _selectedClass
+            : 'Tất cả Lớp';
+
+        if (selected != _selectedClass) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() => _selectedClass = selected);
+            }
+          });
+        }
+
+        return _buildDropdown(
+          title: 'LỚP',
+          value: selected,
+          items: sorted,
+          onChanged: (val) =>
+              setState(() => _selectedClass = val ?? 'Tất cả Lớp'),
+        );
+      },
+    );
+  }
+
+  Future<void> _editStudent(Map<String, String> student) async {
+    if (!_canEditStudent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chỉ giảng viên được phép sửa thông tin sinh viên.'),
+        ),
+      );
+      return;
+    }
+
+    final fullNameController = TextEditingController(
+      text: student['name'] ?? '',
+    );
+    final dobController = TextEditingController(text: student['dob'] ?? '');
+    final classController = TextEditingController(text: student['class'] ?? '');
+    final khoaController = TextEditingController(text: student['khoa'] ?? '');
+    final emailController = TextEditingController(text: student['email'] ?? '');
+    final idController = TextEditingController(text: student['id'] ?? '');
+    final idNumberController = TextEditingController(
+      text: student['idNumber'] ?? '',
+    );
+    final addressController = TextEditingController(
+      text: student['address'] ?? '',
+    );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sửa thông tin sinh viên'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: idController,
+                decoration: const InputDecoration(labelText: 'Mã sinh viên'),
+              ),
+              TextField(
+                controller: fullNameController,
+                decoration: const InputDecoration(labelText: 'Họ tên'),
+              ),
+              TextField(
+                controller: dobController,
+                decoration: const InputDecoration(labelText: 'Ngày sinh'),
+              ),
+              TextField(
+                controller: classController,
+                decoration: const InputDecoration(labelText: 'Lớp'),
+              ),
+              TextField(
+                controller: khoaController,
+                decoration: const InputDecoration(labelText: 'Khoa'),
+              ),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              TextField(
+                controller: idNumberController,
+                decoration: const InputDecoration(labelText: 'CMND/CCCD'),
+              ),
+              TextField(
+                controller: addressController,
+                decoration: const InputDecoration(labelText: 'Địa chỉ'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved != true) return;
+    if (!mounted) return;
+
+    final docId = student['docId'];
+    if (docId == null || docId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không xác định được hồ sơ sinh viên để cập nhật.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('student_profiles')
+          .doc(docId)
+          .set({
+            'studentId': idController.text.trim(),
+            'fullName': fullNameController.text.trim(),
+            'dob': dobController.text.trim(),
+            'lop': classController.text.trim(),
+            'khoa': khoaController.text.trim(),
+            'email': emailController.text.trim(),
+            'idNumber': idNumberController.text.trim(),
+            'address': addressController.text.trim(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã cập nhật thông tin sinh viên.')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Cập nhật thất bại: $e')));
+      }
+    }
   }
 
   @override
@@ -73,8 +282,9 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: _logout,
             icon: const Icon(Icons.account_circle_outlined, size: 30),
+            tooltip: 'Đăng xuất',
           ),
         ],
       ),
@@ -197,21 +407,7 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
                     padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: _buildDropdown(
-                            title: 'LỚP',
-                            value: _selectedClass,
-                            items: const [
-                              'Tất cả Lớp',
-                              'CNTT-01',
-                              'CNTT-02',
-                              'KT-01',
-                            ],
-                            onChanged: (val) => setState(
-                              () => _selectedClass = val ?? 'Tất cả Lớp',
-                            ),
-                          ),
-                        ),
+                        Expanded(child: _buildClassDropdownFromStudents()),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildDropdown(
@@ -325,10 +521,18 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                _BottomTab(icon: Icons.groups, label: 'HỒ SƠ', active: true),
-                _BottomTab(icon: Icons.bookmark_border, label: 'LỚP HỌC'),
-                _BottomTab(icon: Icons.settings, label: 'CÀI ĐẶT'),
+              children: [
+                const _BottomTab(
+                  icon: Icons.groups,
+                  label: 'HỒ SƠ',
+                  active: true,
+                ),
+                _BottomTab(
+                  icon: Icons.bookmark_border,
+                  label: 'LỚP HỌC',
+                  onTap: _openClassManagement,
+                ),
+                const _BottomTab(icon: Icons.settings, label: 'CÀI ĐẶT'),
               ],
             ),
           ),
@@ -421,7 +625,7 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
               ),
               Row(
                 children: [
-                  _iconSquare(Icons.edit, onTap: () {}),
+                  _iconSquare(Icons.edit, onTap: () => _editStudent(student)),
                   const SizedBox(width: 8),
                   _iconSquare(Icons.delete_outline, onTap: () {}),
                 ],
@@ -518,30 +722,39 @@ class _BottomTab extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   const _BottomTab({
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = active ? Colors.black : const Color(0xFFABABAB);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 30),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 30),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
