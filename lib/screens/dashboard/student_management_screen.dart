@@ -26,6 +26,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
+  void _openGrades() {
+    Navigator.of(context).pushNamed(
+      '/student-grades',
+      arguments: {'email': _emailController.text.trim(), 'role': 'Sinh viên'},
+    );
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -160,6 +167,11 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           onPressed: () => Navigator.maybePop(context),
         ),
         actions: [
+          IconButton(
+            onPressed: _openGrades,
+            icon: const Icon(Icons.grade_outlined),
+            tooltip: 'Bảng điểm',
+          ),
           IconButton(
             onPressed: _logout,
             icon: const Icon(Icons.logout),

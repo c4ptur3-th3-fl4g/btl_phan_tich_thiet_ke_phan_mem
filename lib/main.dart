@@ -5,7 +5,9 @@ import 'firebase_options.dart';
 import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
 import 'screens/dashboard/class_management_screen.dart';
+import 'screens/dashboard/grade_entry_screen.dart';
 import 'screens/dashboard/manager_student_list_screen.dart';
+import 'screens/dashboard/student_grades_screen.dart';
 import 'screens/dashboard/student_management_screen.dart';
 
 Future<void> _ensureDefaultAdminUser() async {
@@ -46,6 +48,8 @@ class MyApp extends StatelessWidget {
         '/dashboard': (context) => const StudentManagementScreen(),
         '/manager-dashboard': (context) => const ManagerStudentListScreen(),
         '/class-management': (context) => const ClassManagementScreen(),
+        '/grade-entry': (context) => const GradeEntryScreen(),
+        '/student-grades': (context) => const StudentGradesScreen(),
       },
     );
   }

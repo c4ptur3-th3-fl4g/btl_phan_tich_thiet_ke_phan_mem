@@ -52,6 +52,22 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
     );
   }
 
+  void _openGradeEntry() {
+    if (_role != 'Giảng viên' && _role != 'Quản trị') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Tính năng nhập điểm chỉ dành cho giảng viên/quản trị viên.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.of(
+      context,
+    ).pushNamed('/grade-entry', arguments: {'email': _email, 'role': _role});
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -531,6 +547,11 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
                   icon: Icons.bookmark_border,
                   label: 'LỚP HỌC',
                   onTap: _openClassManagement,
+                ),
+                _BottomTab(
+                  icon: Icons.grade_outlined,
+                  label: 'ĐIỂM SỐ',
+                  onTap: _openGradeEntry,
                 ),
                 const _BottomTab(icon: Icons.settings, label: 'CÀI ĐẶT'),
               ],
