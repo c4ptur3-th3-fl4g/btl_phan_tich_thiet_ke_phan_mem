@@ -11,9 +11,10 @@ class ClassManagementScreen extends StatefulWidget {
 class _ClassManagementScreenState extends State<ClassManagementScreen> {
   bool _didInit = false;
   String _role = '';
-  String _email = '';
 
-  bool get _canManageClasses => _role == 'Giảng viên' || _role == 'Quản trị';
+  bool get _canViewClassSections =>
+      _role == 'Giảng viên' || _role == 'Quản trị';
+  bool get _canManageClassSections => _role == 'Quản trị';
 
   Future<void> _ensureDefaultAdminUser() async {
     await FirebaseFirestore.instance.collection('users').doc('ad min').set({
@@ -49,6 +50,128 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     return {'faculties': sortedFaculties, 'classes': sortedClasses};
   }
 
+  Future<Map<String, String>> _loadLecturerOptions() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'Giảng viên')
+        .get();
+
+    final lecturers = <String, String>{};
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final email = (data['email'] as String?)?.trim();
+      if (email == null || email.isEmpty) continue;
+      final name = (data['name'] as String?)?.trim().isNotEmpty == true
+          ? (data['name'] as String).trim()
+          : 'Chưa có tên';
+      lecturers[email] = name;
+    }
+
+    final sortedEntries = lecturers.entries.toList()
+      ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
+    return {for (final entry in sortedEntries) entry.key: entry.value};
+  }
+
+  Future<List<String>> _loadSubjectOptions() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('subjects')
+        .get();
+
+    final subjects = <String>{};
+    for (final doc in snapshot.docs) {
+      final name = (doc.data()['name'] as String?)?.trim();
+      if (name != null && name.isNotEmpty) {
+        subjects.add(name);
+      }
+    }
+
+    final sorted = subjects.toList()..sort();
+    return sorted;
+  }
+
+  Future<void> _showSubjectForm() async {
+    if (!_canManageClassSections) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chỉ quản trị viên được tạo môn học.')),
+        );
+      }
+      return;
+    }
+
+    final subjectNameController = TextEditingController();
+    final subjectCodeController = TextEditingController();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thêm môn học'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: subjectNameController,
+                decoration: const InputDecoration(labelText: 'Tên môn học'),
+              ),
+              TextField(
+                controller: subjectCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Mã môn học (không bắt buộc)',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved != true) return;
+
+    final subjectName = subjectNameController.text.trim();
+    final subjectCode = subjectCodeController.text.trim();
+
+    if (subjectName.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tên môn học không được để trống.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('subjects').add({
+        'name': subjectName,
+        'code': subjectCode,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Đã thêm môn học.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể thêm môn học: $e')));
+      }
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -58,25 +181,66 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _role = (args?['role'] as String?) ?? '';
-    _email = (args?['email'] as String?) ?? '';
     _ensureDefaultAdminUser();
   }
 
   Future<void> _showClassForm({
     DocumentSnapshot<Map<String, dynamic>>? doc,
   }) async {
+    if (!_canManageClassSections) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chỉ quản trị viên được tạo/sửa lớp học phần.'),
+          ),
+        );
+      }
+      return;
+    }
+
     final data = doc?.data() ?? <String, dynamic>{};
 
-    final options = await _loadFacultyAndClassOptions();
+    final results = await Future.wait([
+      _loadFacultyAndClassOptions(),
+      _loadLecturerOptions(),
+      _loadSubjectOptions(),
+    ]);
+
+    final options = results[0] as Map<String, List<String>>;
+    final lecturerMap = results[1] as Map<String, String>;
+    final subjectOptions = results[2] as List<String>;
     if (!mounted) return;
     final facultyOptions = options['faculties'] ?? <String>[];
     final classOptions = options['classes'] ?? <String>[];
+    final lecturerEmails = lecturerMap.keys.toList();
 
     if (classOptions.isEmpty || facultyOptions.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Chưa có dữ liệu ngành/lớp từ sinh viên để chọn.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (lecturerEmails.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chưa có tài khoản giảng viên để gán lớp học phần.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (subjectOptions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chưa có môn học. Vui lòng thêm môn học trước.'),
           ),
         );
       }
@@ -96,9 +260,34 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       selectedClass = classOptions.first;
     }
 
+    String selectedSubject =
+        (data['className'] as String?)?.trim() ?? subjectOptions.first;
+    if (!subjectOptions.contains(selectedSubject)) {
+      selectedSubject = subjectOptions.first;
+    }
+
+    String selectedLecturerEmail =
+        (data['lecturerEmail'] as String?)?.trim() ?? lecturerEmails.first;
+    if (!lecturerMap.containsKey(selectedLecturerEmail)) {
+      final existingName = (data['lecturerName'] as String?)?.trim();
+      if (selectedLecturerEmail.isNotEmpty) {
+        lecturerMap[selectedLecturerEmail] = existingName?.isNotEmpty == true
+            ? existingName!
+            : 'Chưa có tên';
+        lecturerEmails.add(selectedLecturerEmail);
+        lecturerEmails.sort(
+          (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
+        );
+      } else {
+        selectedLecturerEmail = lecturerEmails.first;
+      }
+    }
+    String selectedLecturerName =
+        lecturerMap[selectedLecturerEmail] ?? 'Chưa có tên';
     final lecturerNameController = TextEditingController(
-      text: (data['lecturerName'] as String?) ?? '',
+      text: selectedLecturerName,
     );
+
     final maxStudentsController = TextEditingController(
       text: ((data['maxStudents'] as num?) ?? 50).toString(),
     );
@@ -156,10 +345,54 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                         setDialogState(() => selectedFaculty = value);
                       },
                     ),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedSubject,
+                      decoration: const InputDecoration(
+                        labelText: 'Tên môn học',
+                      ),
+                      items: subjectOptions
+                          .map(
+                            (subject) => DropdownMenuItem<String>(
+                              value: subject,
+                              child: Text(subject),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedSubject = value);
+                      },
+                    ),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedLecturerEmail,
+                      decoration: const InputDecoration(
+                        labelText: 'Email giảng viên',
+                      ),
+                      items: lecturerEmails
+                          .map(
+                            (email) => DropdownMenuItem<String>(
+                              value: email,
+                              child: Text(email),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          selectedLecturerEmail = value;
+                          selectedLecturerName =
+                              lecturerMap[selectedLecturerEmail] ??
+                              'Chưa có tên';
+                          lecturerNameController.text = selectedLecturerName;
+                        });
+                      },
+                    ),
                     TextField(
                       controller: lecturerNameController,
+                      readOnly: true,
+                      enabled: false,
                       decoration: const InputDecoration(
-                        labelText: 'Giảng viên',
+                        labelText: 'Tên giảng viên',
                       ),
                     ),
                     TextField(
@@ -202,7 +435,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
     if (saved != true) return;
 
     final classCode = selectedClass.trim();
-    final className = selectedClass.trim();
+    final className = selectedSubject.trim();
     final maxStudents = int.tryParse(maxStudentsController.text.trim()) ?? 0;
     final currentStudents =
         int.tryParse(currentStudentsController.text.trim()) ?? 0;
@@ -211,7 +444,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Mã lớp và tên lớp không được để trống.'),
+            content: Text('Mã lớp và tên môn học không được để trống.'),
           ),
         );
       }
@@ -235,8 +468,8 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
       'classCode': classCode,
       'className': className,
       'faculty': selectedFaculty,
-      'lecturerName': lecturerNameController.text.trim(),
-      'lecturerEmail': _email,
+      'lecturerName': selectedLecturerName,
+      'lecturerEmail': selectedLecturerEmail,
       'maxStudents': maxStudents,
       'currentStudents': currentStudents,
       'description': descriptionController.text.trim(),
@@ -273,6 +506,17 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
   }
 
   Future<void> _deleteClass(DocumentSnapshot<Map<String, dynamic>> doc) async {
+    if (!_canManageClassSections) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chỉ quản trị viên được xóa lớp học phần.'),
+          ),
+        );
+      }
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -325,7 +569,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
             ),
             const SizedBox(height: 12),
             Text('Mã lớp: ${d['classCode'] ?? ''}'),
-            Text('Tên lớp: ${d['className'] ?? ''}'),
+            Text('Môn học: ${d['className'] ?? ''}'),
             Text('Khoa: ${d['faculty'] ?? ''}'),
             Text('Giảng viên: ${d['lecturerName'] ?? ''}'),
             Text(
@@ -341,33 +585,37 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_canManageClasses) {
+    if (!_canViewClassSections) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Quản lý lớp học')),
+        appBar: AppBar(title: const Text('Lớp học phần')),
         body: const Center(
-          child: Text('Chỉ giảng viên và quản trị viên được quản lý lớp học.'),
+          child: Text('Chỉ giảng viên và quản trị viên được xem lớp học phần.'),
         ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quản lý lớp học'),
-        actions: [
-          IconButton(
-            onPressed: () => _showClassForm(),
-            icon: const Icon(Icons.add),
-            tooltip: 'Thêm lớp',
-          ),
-        ],
+        title: Text(
+          _canManageClassSections ? 'Quản lý lớp học phần' : 'Xem lớp học phần',
+        ),
+        actions: _canManageClassSections
+            ? [
+                IconButton(
+                  onPressed: _showSubjectForm,
+                  icon: const Icon(Icons.menu_book_outlined),
+                  tooltip: 'Thêm môn học',
+                ),
+                IconButton(
+                  onPressed: () => _showClassForm(),
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Thêm lớp học phần',
+                ),
+              ]
+            : null,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _role == 'Quản trị'
-            ? FirebaseFirestore.instance.collection('classes').snapshots()
-            : FirebaseFirestore.instance
-                  .collection('classes')
-                  .where('lecturerEmail', isEqualTo: _email)
-                  .snapshots(),
+        stream: FirebaseFirestore.instance.collection('classes').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -397,9 +645,7 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
               final docs = classDocs.where((doc) {
                 final data = doc.data();
                 final code = (data['classCode'] as String?)?.trim() ?? '';
-                final name = (data['className'] as String?)?.trim() ?? '';
-                return (classCounts[code] ?? 0) > 0 ||
-                    (classCounts[name] ?? 0) > 0;
+                return (classCounts[code] ?? 0) > 0;
               }).toList();
 
               if (docs.isEmpty) {
@@ -448,19 +694,21 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
                                     icon: const Icon(Icons.info_outline),
                                     tooltip: 'Thông tin lớp',
                                   ),
-                                  IconButton(
-                                    onPressed: () => _showClassForm(doc: doc),
-                                    icon: const Icon(Icons.edit),
-                                    tooltip: 'Sửa lớp',
-                                  ),
-                                  IconButton(
-                                    onPressed: () => _deleteClass(doc),
-                                    icon: const Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red,
+                                  if (_canManageClassSections)
+                                    IconButton(
+                                      onPressed: () => _showClassForm(doc: doc),
+                                      icon: const Icon(Icons.edit),
+                                      tooltip: 'Sửa lớp',
                                     ),
-                                    tooltip: 'Xóa lớp',
-                                  ),
+                                  if (_canManageClassSections)
+                                    IconButton(
+                                      onPressed: () => _deleteClass(doc),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
+                                      tooltip: 'Xóa lớp',
+                                    ),
                                 ],
                               ),
                             ],
@@ -490,11 +738,13 @@ class _ClassManagementScreenState extends State<ClassManagementScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showClassForm(),
-        label: const Text('Thêm lớp'),
-        icon: const Icon(Icons.add),
-      ),
+      floatingActionButton: _canManageClassSections
+          ? FloatingActionButton.extended(
+              onPressed: () => _showClassForm(),
+              label: const Text('Thêm lớp học phần'),
+              icon: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

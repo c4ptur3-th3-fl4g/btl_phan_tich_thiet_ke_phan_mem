@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:excel/excel.dart' show Excel, IntCellValue, TextCellValue;
+import 'dart:typed_data';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class ManagerStudentListScreen extends StatefulWidget {
   const ManagerStudentListScreen({super.key});
@@ -15,6 +19,7 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
   String _selectedKhoa = 'Tất cả Khoa';
   int _currentPage = 1;
   bool _didInit = false;
+  bool _isExporting = false;
   String _role = '';
   String _email = '';
 
@@ -280,6 +285,144 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
     }
   }
 
+  Future<void> _exportStudentsToExcel() async {
+    if (_isExporting) return;
+
+    setState(() => _isExporting = true);
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('student_profiles')
+          .get();
+
+      final allStudents = _mapSnapshotToStudents(snapshot);
+      final students = _applyFilters(allStudents)
+        ..sort(
+          (a, b) => (a['name'] ?? '').toLowerCase().compareTo(
+            (b['name'] ?? '').toLowerCase(),
+          ),
+        );
+
+      if (students.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không có dữ liệu sinh viên để export.'),
+          ),
+        );
+        return;
+      }
+
+      final excel = Excel.createExcel();
+      const sheetName = 'DanhSachSinhVien';
+      final defaultSheet = excel.getDefaultSheet();
+      if (defaultSheet != null && defaultSheet != sheetName) {
+        excel.delete(defaultSheet);
+      }
+
+      final sheet = excel[sheetName];
+      sheet.appendRow([
+        TextCellValue('STT'),
+        TextCellValue('MSSV'),
+        TextCellValue('Họ tên'),
+        TextCellValue('Ngày sinh'),
+        TextCellValue('Lớp'),
+        TextCellValue('Khoa'),
+        TextCellValue('Email'),
+        TextCellValue('CMND/CCCD'),
+        TextCellValue('Địa chỉ'),
+      ]);
+
+      for (var i = 0; i < students.length; i++) {
+        final student = students[i];
+        sheet.appendRow([
+          IntCellValue(i + 1),
+          TextCellValue(student['id'] ?? ''),
+          TextCellValue(student['name'] ?? ''),
+          TextCellValue(student['dob'] ?? ''),
+          TextCellValue(student['class'] ?? ''),
+          TextCellValue(student['khoa'] ?? ''),
+          TextCellValue(student['email'] ?? ''),
+          TextCellValue(student['idNumber'] ?? ''),
+          TextCellValue(student['address'] ?? ''),
+        ]);
+      }
+
+      final bytes = excel.encode();
+      if (bytes == null) {
+        throw Exception('Không thể tạo file Excel');
+      }
+
+      final now = DateTime.now();
+      final timestamp =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
+          '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
+      final fileName = 'danh_sach_sinh_vien_$timestamp.xlsx';
+      final savedPath = await _saveExcelToDevice(
+        fileName: fileName,
+        bytes: Uint8List.fromList(bytes),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Đã export ${students.length} sinh viên. File: $savedPath',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export thất bại: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  Future<String> _saveExcelToDevice({
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    Directory? targetDir;
+
+    if (Platform.isAndroid) {
+      final publicDownload = Directory('/storage/emulated/0/Download');
+      if (await publicDownload.exists()) {
+        try {
+          final file = File('${publicDownload.path}/$fileName');
+          await file.writeAsBytes(bytes, flush: true);
+          return file.path;
+        } catch (_) {
+          // Fall back to app-specific external directory.
+        }
+      }
+
+      targetDir = await getExternalStorageDirectory();
+    } else if (Platform.isIOS) {
+      targetDir = await getApplicationDocumentsDirectory();
+    } else if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
+      targetDir = await getDownloadsDirectory();
+      targetDir ??= await getApplicationDocumentsDirectory();
+    }
+
+    if (targetDir == null) {
+      throw Exception('Không tìm thấy thư mục lưu file phù hợp trên thiết bị.');
+    }
+
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+
+    final file = File('${targetDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -359,11 +502,23 @@ class _ManagerStudentListScreenState extends State<ManagerStudentListScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.file_download_outlined),
-                            label: const Text(
-                              'Export danh sách',
-                              style: TextStyle(fontSize: 34 / 2),
+                            onPressed: _isExporting
+                                ? null
+                                : _exportStudentsToExcel,
+                            icon: _isExporting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.file_download_outlined),
+                            label: Text(
+                              _isExporting
+                                  ? 'Đang export...'
+                                  : 'Export danh sách',
+                              style: const TextStyle(fontSize: 34 / 2),
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.black,
